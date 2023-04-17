@@ -1,19 +1,18 @@
 import exceptions.DBAppException;
 import model.SQLTerm;
 import model.Table;
+import model.TableMetadata;
 import service.AppConfigs;
 import service.FileProcessor;
 
 import java.io.*;
 import java.lang.reflect.Field;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Vector;
+import java.util.*;
 
 public class DBApp {
 
     AppConfigs appConfigs = AppConfigs.getInstance();
+    static HashMap<String, Integer> currentPart = new HashMap<>();
 
     public static void main(String[] args) throws DBAppException {
 
@@ -23,24 +22,54 @@ public class DBApp {
         //Initialize Application related Configs
         dbApp.init();
 
-        Hashtable htblColNameType = new Hashtable();
-        htblColNameType.put("id", "java.lang.Integer");
-        htblColNameType.put("name", "java.lang.String");
-        htblColNameType.put("gpa", "java.lang.double");
-
-        dbApp.createTable(strTableName, "id", htblColNameType);
-
+        tableGenerator(strTableName, dbApp);
 
         //dbApp.createIndex(strTableName, new String[]{"gpa"});
 
+        tableDataGenerator(strTableName, dbApp);
+
+        updateTableData(strTableName, dbApp);
+
+        deleteTableData(strTableName, dbApp);
+
+        //queryOutputGenerator(dbApp);
+    }
+
+    private static void deleteTableData(String strTableName, DBApp dbApp) throws DBAppException {
+
+        Hashtable htblColNameValue = new Hashtable();
+        htblColNameValue.put("id", new String("2343432"));
+
+        deleteFromTable(strTableName, htblColNameValue);
+    }
+
+    private static void updateTableData(String strTableName, DBApp dbApp) throws DBAppException {
+        Hashtable htblColNameValue = new Hashtable();
+        htblColNameValue.put("name", new String("Ahmed Khan"));
+
+        updateTable(strTableName, "2343432", htblColNameValue);
+
+    }
+
+    private static void queryOutputGenerator(DBApp dbApp) throws DBAppException {
+        SQLTerm[] arrSQLTerms = new SQLTerm[2];
+        arrSQLTerms[0]._strTableName = "Student";
+        arrSQLTerms[0]._strColumnName = "name";
+        arrSQLTerms[0]._strOperator = "=";
+        arrSQLTerms[0]._objValue = "John Noor";
+        arrSQLTerms[1]._strTableName = "Student";
+        arrSQLTerms[1]._strColumnName = "gpa";
+        arrSQLTerms[1]._strOperator = "=";
+        arrSQLTerms[1]._objValue = new Double(1.5);
+        String[] strarrOperators = new String[1];
+        strarrOperators[0] = "OR";
+
+        Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+    }
+
+    private static void tableDataGenerator(String strTableName, DBApp dbApp) throws DBAppException {
         Hashtable htblColNameValue = new Hashtable();
         htblColNameValue.put("id", new Integer(2343432));
-        htblColNameValue.put("name", new String("Ahmed Noor"));
-        htblColNameValue.put("gpa", new Double(0.95));
-        dbApp.insertIntoTable(strTableName, htblColNameValue);
-
-        htblColNameValue.clear();
-        htblColNameValue.put("id", new Integer(453455));
         htblColNameValue.put("name", new String("Ahmed Noor"));
         htblColNameValue.put("gpa", new Double(0.95));
         dbApp.insertIntoTable(strTableName, htblColNameValue);
@@ -62,47 +91,69 @@ public class DBApp {
         htblColNameValue.put("name", new String("Zaky Noor"));
         htblColNameValue.put("gpa", new Double(0.88));
         dbApp.insertIntoTable(strTableName, htblColNameValue);
+    }
 
-        SQLTerm[] arrSQLTerms;
-        arrSQLTerms = new SQLTerm[2];
-        arrSQLTerms[0]._strTableName = "Student";
-        arrSQLTerms[0]._strColumnName = "name";
-        arrSQLTerms[0]._strOperator = "=";
-        arrSQLTerms[0]._objValue = "John Noor";
-        arrSQLTerms[1]._strTableName = "Student";
-        arrSQLTerms[1]._strColumnName = "gpa";
-        arrSQLTerms[1]._strOperator = "=";
-        arrSQLTerms[1]._objValue = new Double(1.5);
-        String[] strarrOperators = new String[1];
-        strarrOperators[0] = "OR";
+    private static void tableGenerator(String strTableName, DBApp dbApp) throws DBAppException {
 
-        Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+        Hashtable htblColNameType = new Hashtable();
+        htblColNameType.put("id", "java.lang.Integer");
+        htblColNameType.put("name", "java.lang.String");
+        htblColNameType.put("gpa", "java.lang.double");
+
+        Hashtable htblColNameMin = new Hashtable();
+        htblColNameMin.put("id", "0");
+        htblColNameMin.put("name", "A");
+        htblColNameMin.put("gpa", "A");
+
+        Hashtable htblColNameMax = new Hashtable();
+        htblColNameMax.put("id", "10000");
+        htblColNameMax.put("name", "ZZZZZZ");
+        htblColNameMax.put("gpa", "ZZZZZZ");
+
+        dbApp.createTable(strTableName, "id", htblColNameType, htblColNameMin, htblColNameMax);
+
+        //Initializing the default file part number for the table
+        currentPart.put(strTableName, 1);
     }
 
     public void init() {
-        appConfigs.loadConfigs("resources/DBApp.config");
+        appConfigs.loadConfigs("src/main/resources/DBApp.config");
     }
 
 
-    // following method creates one table only
-    // strClusteringKeyColumn is the name of the column that will be the primary
-    // key and the clustering column as well. The data type of that column will
-    // be passed in htblColNameType
-    // htblColNameValue will have the column name as key and the data
-    // type as value
-    // htblColNameMin and htblColNameMax for passing minimum and maximum values
-    // for data in the column. Key is the name of the column
     public void createTable(String strTableName,
                             String strClusteringKeyColumn,
-                            Hashtable<String, String> htblColNameType)
+                            Hashtable<String, String> htblColNameType,
+                            Hashtable<String, String> htblColNameMin,
+                            Hashtable<String, String> htblColNameMax)
             throws DBAppException {
+
+        String fileName = "src/main/resources/output/metadata.csv";
+
+        Vector<TableMetadata> metadata = new Vector<>();
+
+        htblColNameType.keySet().forEach(key -> {
+            TableMetadata tableMetadata = new TableMetadata();
+            tableMetadata.setTableName(strTableName);
+            tableMetadata.setColumnName(key);
+            tableMetadata.setColumnType(htblColNameType.get(key));
+            tableMetadata.setIndexType("Octree");
+
+            if (key.equalsIgnoreCase(strClusteringKeyColumn)) {
+                tableMetadata.setClusteringKey(true);
+                tableMetadata.setIndexType(null);
+            }
+
+            tableMetadata.setMin(htblColNameMin.get(key));
+            tableMetadata.setMax(htblColNameMax.get(key));
+            metadata.add(tableMetadata);
+        });
+
+        FileProcessor.saveMetaData(fileName, metadata);
+
 
     }
 
-    // following method creates an octree
-    // depending on the count of column names passed.
-    // If three column names are passed, create an octree.
-    // If only one or two column names is passed, throw an Exception.
     public void createIndex(String strTableName,
                             String[] strarrColName) throws DBAppException {
 
@@ -126,14 +177,15 @@ public class DBApp {
         Vector<Table> data = new Vector<>();
         data.add(table);
 
-        int partNo = 1;
+        int partNo = currentPart.get(strTableName);
         int maxLines = Integer.parseInt(appConfigs.getConfigs().getProperty("MaximumRowsCountinTablePage", "200"));
 
         try {
-            File file = new File(fileName);
+            String filePath = "src/main/resources/output/" + strTableName + partNo + ".ser";
+            File file = new File(filePath);
             if (file.exists()) {
                 int lineCount = 0;
-                try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
+                try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
                     while (br.readLine() != null) {
                         lineCount++;
                     }
@@ -141,11 +193,13 @@ public class DBApp {
 
                 if (lineCount > maxLines) {
                     partNo++;
+                    currentPart.put(strTableName, partNo);
+                    filePath = "src/main/resources/output/" + strTableName + partNo + ".ser";
                     System.out.println("Number of lines exceeds maximum limit, Creating another page.");
                 }
             }
 
-            FileProcessor.saveOrUpdateFile(strTableName + partNo, data);
+            FileProcessor.saveOrUpdateFile(filePath, data);
 
 
             System.out.println("Serialized data is saved in info.ser");
@@ -157,32 +211,43 @@ public class DBApp {
 
     }
 
-    public void updateTable(String strTableName,
-                            String strClusteringKeyValue,
-                            Hashtable<String, Object> htblColNameValue)
+    public static void updateTable(String strTableName,
+                                   String strClusteringKeyValue,
+                                   Hashtable<String, Object> htblColNameValue)
             throws DBAppException {
 
         try {
 
-            // Read objects from the file
-            List<Table> list = FileProcessor.readFile(strTableName);
-
-            // Modify objects as per your requirement
-            for (Table table : list) {
-                if (table.getId() == Integer.parseInt(strClusteringKeyValue)) {
-                    htblColNameValue.keySet().forEach(key -> {
-                        Field field;
-                        try {
-                            field = table.getClass().getDeclaredField(key);
-                            field.set(table, htblColNameValue.get(key));
-                            field.setAccessible(true);
-                        } catch (NoSuchFieldException | IllegalAccessException e) {
-                            throw new RuntimeException(e);
+            String path = "src/main/resources/output/";
+            File folder = new File(path);
+            File[] files = folder.listFiles((dir, name) -> name.startsWith(strTableName));
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile()) {
+                        List<Table> list = FileProcessor.readFile(file.toString());
+                        for (Table table : list) {
+                            if (table.getId() == Integer.parseInt(strClusteringKeyValue)) {
+                                System.out.println("Old Row: " + table);
+                                htblColNameValue.keySet().forEach(key -> {
+                                    Field field;
+                                    try {
+                                        field = table.getClass().getDeclaredField(key);
+                                        field.set(table, htblColNameValue.get(key));
+                                        field.setAccessible(true);
+                                        System.out.println("Updated Row: " + table);
+                                    } catch (NoSuchFieldException | IllegalAccessException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                });
+                            }
                         }
-                    });
+                        FileProcessor.saveOrUpdateFile(file.toString(), list);
+                    }
                 }
 
-                FileProcessor.saveOrUpdateFile(strTableName, list);
+
+                // Modify objects as per your requirement
+
 
             }
         } catch (Exception e) {
@@ -190,36 +255,56 @@ public class DBApp {
         }
     }
 
-    public void deleteFromTable(String strTableName,
-                                Hashtable<String, Object> htblColNameValue)
+    public static void deleteFromTable(String strTableName,
+                                       Hashtable<String, Object> htblColNameValue)
             throws DBAppException {
 
         try {
-            // Read the .ser file into memory
-            List<Table> objects = FileProcessor.readFile(strTableName);
 
-            String fieldName = htblColNameValue.keySet().stream().findFirst().get();
-            Object value = htblColNameValue.get(fieldName);
+            String path = "src/main/resources/output/";
+            File folder = new File(path);
+            File[] files = folder.listFiles((dir, name) -> name.startsWith(strTableName));
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile()) {
+                        List<Table> rows = FileProcessor.readFile(file.toString());
+                        System.out.println("Rows Count: "+rows.size());
+                            htblColNameValue.keySet().forEach(key -> {
+                                String fieldName = key;
+                                Object value = htblColNameValue.get(fieldName);
 
-            // Iterate over each object and remove it if it finds the value in the search
-            objects.removeIf(obj -> {
-                Field field;
-                try {
-                    field = obj.getClass().getDeclaredField(fieldName);
-                    field.setAccessible(true);
-                    if (field.get(obj) == value) {
-                        return true;
+                                // Iterate over each object and remove it if it finds the value in the search
+                                rows.removeIf(obj -> {
+                                    Field field;
+                                    try {
+                                        field = obj.getClass().getDeclaredField(fieldName);
+                                        field.setAccessible(true);
+                                        if (field.get(obj) == value) {
+                                            return true;
+                                        }
+                                    } catch (NoSuchFieldException | IllegalAccessException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    return false;
+                                });
+                            });
+                        System.out.println("Updated Row Count: "+rows.size());
+                        if(rows.size()==0){
+                            if (file.delete()) {
+                                System.out.println("File deleted successfully: "+file.getName());
+                            } else {
+                                System.out.println("Failed to delete the file: "+file.getName());
+                            }
+                        }
+                        FileProcessor.saveOrUpdateFile(file.toString(), rows);
                     }
-                } catch (NoSuchFieldException | IllegalAccessException e) {
-                    throw new RuntimeException(e);
                 }
-                return false;
-            });
+            }
 
-            FileProcessor.saveOrUpdateFile(strTableName, objects);
+
 
         } catch (Exception e) {
-            throw new DBAppException("Exception while updating the row");
+            throw new DBAppException("Exception while Deleting Data");
         }
 
     }

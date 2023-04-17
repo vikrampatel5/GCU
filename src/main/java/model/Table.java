@@ -3,9 +3,9 @@ package model;
 import java.io.Serializable;
 
 public class Table implements Serializable {
-    int id;
-    String name;
-    double gpa;
+    public int id;
+    public String name;
+    public double gpa;
 
     public Table() {
     }
@@ -38,5 +38,14 @@ public class Table implements Serializable {
 
     public void setGpa(double gpa) {
         this.gpa = gpa;
+    }
+
+    @Override
+    public String toString() {
+        return "Table{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", gpa=" + gpa +
+                '}';
     }
 }
