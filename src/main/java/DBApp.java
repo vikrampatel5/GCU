@@ -32,13 +32,13 @@ public class DBApp {
 
         deleteTableData(strTableName, dbApp);
 
-        //queryOutputGenerator(dbApp);
+        queryOutputGenerator(dbApp);
     }
 
     private static void deleteTableData(String strTableName, DBApp dbApp) throws DBAppException {
 
         Hashtable htblColNameValue = new Hashtable();
-        htblColNameValue.put("id", new String("2343432"));
+        htblColNameValue.put("id", new String("23498"));
 
         deleteFromTable(strTableName, htblColNameValue);
     }
@@ -53,10 +53,13 @@ public class DBApp {
 
     private static void queryOutputGenerator(DBApp dbApp) throws DBAppException {
         SQLTerm[] arrSQLTerms = new SQLTerm[2];
+        arrSQLTerms[0] = new SQLTerm();
         arrSQLTerms[0]._strTableName = "Student";
         arrSQLTerms[0]._strColumnName = "name";
         arrSQLTerms[0]._strOperator = "=";
         arrSQLTerms[0]._objValue = "John Noor";
+
+        arrSQLTerms[1] = new SQLTerm();
         arrSQLTerms[1]._strTableName = "Student";
         arrSQLTerms[1]._strColumnName = "gpa";
         arrSQLTerms[1]._strOperator = "=";
@@ -65,6 +68,10 @@ public class DBApp {
         strarrOperators[0] = "OR";
 
         Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+
+        while(resultSet.hasNext()) {
+            System.out.println(resultSet.next());
+        }
     }
 
     private static void tableDataGenerator(String strTableName, DBApp dbApp) throws DBAppException {
@@ -163,7 +170,6 @@ public class DBApp {
                                 Hashtable<String, Object> htblColNameValue)
             throws DBAppException {
 
-        String fileName = strTableName + "_part";
         Table table = new Table();
 
         if (htblColNameValue.get("id") == null) {
@@ -184,14 +190,9 @@ public class DBApp {
             String filePath = "src/main/resources/output/" + strTableName + partNo + ".ser";
             File file = new File(filePath);
             if (file.exists()) {
-                int lineCount = 0;
-                try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-                    while (br.readLine() != null) {
-                        lineCount++;
-                    }
-                }
+                int rowCount = FileProcessor.readFile(file.toString()).size();
 
-                if (lineCount > maxLines) {
+                if (rowCount > maxLines) {
                     partNo++;
                     currentPart.put(strTableName, partNo);
                     filePath = "src/main/resources/output/" + strTableName + partNo + ".ser";
@@ -199,12 +200,12 @@ public class DBApp {
                 }
             }
 
-            FileProcessor.saveOrUpdateFile(filePath, data);
+            FileProcessor.saveOrUpdateFile(filePath, data, true);
 
 
             System.out.println("Serialized data is saved in info.ser");
 
-        } catch (IOException e) {
+        } catch (IOException | ClassNotFoundException e) {
             throw new DBAppException("Error while saving data into page.");
         }
 
@@ -225,6 +226,7 @@ public class DBApp {
                 for (File file : files) {
                     if (file.isFile()) {
                         List<Table> list = FileProcessor.readFile(file.toString());
+                        List<Table> updatedList = new ArrayList<>();
                         for (Table table : list) {
                             if (table.getId() == Integer.parseInt(strClusteringKeyValue)) {
                                 System.out.println("Old Row: " + table);
@@ -240,18 +242,15 @@ public class DBApp {
                                     }
                                 });
                             }
+                            updatedList.add(table);
                         }
-                        FileProcessor.saveOrUpdateFile(file.toString(), list);
+                        FileProcessor.saveOrUpdateFile(file.toString(), updatedList, false);
                     }
                 }
 
-
-                // Modify objects as per your requirement
-
-
             }
         } catch (Exception e) {
-            throw new DBAppException("Exception while updating row!!");
+            throw new DBAppException("Exception while updating row!! "+e.getMessage());
         }
     }
 
@@ -279,7 +278,7 @@ public class DBApp {
                                     try {
                                         field = obj.getClass().getDeclaredField(fieldName);
                                         field.setAccessible(true);
-                                        if (field.get(obj) == value) {
+                                        if (field.get(obj).toString().equalsIgnoreCase(value.toString())) {
                                             return true;
                                         }
                                     } catch (NoSuchFieldException | IllegalAccessException e) {
@@ -288,7 +287,7 @@ public class DBApp {
                                     return false;
                                 });
                             });
-                        System.out.println("Updated Row Count: "+rows.size());
+                        System.out.println("Updated Row Count After Delete: "+rows.size());
                         if(rows.size()==0){
                             if (file.delete()) {
                                 System.out.println("File deleted successfully: "+file.getName());
@@ -296,7 +295,7 @@ public class DBApp {
                                 System.out.println("Failed to delete the file: "+file.getName());
                             }
                         }
-                        FileProcessor.saveOrUpdateFile(file.toString(), rows);
+                        FileProcessor.saveOrUpdateFile(file.toString(), rows, false);
                     }
                 }
             }
@@ -313,18 +312,27 @@ public class DBApp {
                                     String[] strarrOperators)
             throws DBAppException {
 
-        Vector<Table> obj = new Vector<>();
-
         String sql = generateSql(arrSQLTerms, strarrOperators);
+        System.out.println("Generated SQL: "+sql);
 
-        try (FileInputStream fis = new FileInputStream("data.ser");
-             ObjectInputStream ois = new ObjectInputStream(fis)) {
-            obj = (Vector<Table>) ois.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            throw new DBAppException("Exception while reading data from table!!");
+        Vector<Table> rows = new Vector<>();
+
+        String path = "src/main/resources/output/";
+        File folder = new File(path);
+        File[] files = folder.listFiles((dir, name) -> name.startsWith("Student"));
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    try {
+                        rows.addAll(FileProcessor.readFile(file.toString()));
+                    } catch (IOException | ClassNotFoundException e) {
+                        throw new DBAppException("Exception while reading data from table!!");
+                    }
+                }
+            }
         }
 
-        return obj.iterator();
+        return rows.iterator();
     }
 
     private String generateSql(SQLTerm[] arrSQLTerms,
@@ -338,17 +346,14 @@ public class DBApp {
             clause.append(arrSQLTerm._strColumnName)
                     .append(arrSQLTerm._strOperator)
                     .append(arrSQLTerm._objValue);
-            if (index < arrSQLTerms.length) {
-                clause.append(" ")
-                        .append(arrSQLTerm._strOperator)
-                        .append(" ");
+
+            if(index < strarrOperators.length){
+                clause.append(" ").append(strarrOperators[index]).append(" ");
             }
-            clause.append(" ").append(strarrOperators[index]).append(" ");
             index++;
         }
 
         sqlStatement = sqlStatement + tableName + " where " + clause;
-
         return sqlStatement;
     }
 

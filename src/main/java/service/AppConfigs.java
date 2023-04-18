@@ -27,8 +27,8 @@ public class AppConfigs {
         try {
             FileInputStream fis = new FileInputStream(configPath);
             configs.load(fis);
-            System.out.println(configs.getProperty("MaximumRowsCountinTablePage"));
-            System.out.println(configs.getProperty("MaximumEntriesinOctreeNode"));
+            System.out.println("MaximumRowsCountinTablePage: "+configs.getProperty("MaximumRowsCountinTablePage"));
+            System.out.println("MaximumEntriesinOctreeNode: "+configs.getProperty("MaximumEntriesinOctreeNode"));
         } catch (IOException e) {
             System.err.println("Error reading properties file: " + e.getMessage());
         }

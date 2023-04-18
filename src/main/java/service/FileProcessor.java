@@ -9,28 +9,61 @@ import org.apache.commons.csv.CSVPrinter;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
 public class FileProcessor {
 
     public static List<Table> readFile(String strTableName) throws IOException, ClassNotFoundException {
-        FileInputStream fis = new FileInputStream(strTableName);
-        ObjectInputStream ois = new ObjectInputStream(fis);
-        List<Table> objects = (List<Table>) ois.readObject();
-        ois.close();
-        return objects;
+
+
+        File file = new File(strTableName);
+
+        List<Table> rowList = new ArrayList<>();
+
+        if (file.length() != 0) {
+
+            //Create new FileInputStream object to read file
+            FileInputStream fis = new FileInputStream(strTableName);
+            //Create new ObjectInputStream object to read object from file
+            ObjectInputStream ois = new ObjectInputStream(fis);
+
+            while (fis.available() != 0) {
+                rowList.add((Table) ois.readObject());
+            }
+            ois.close();
+            fis.close();
+        }
+
+
+        return rowList;
     }
 
-    public static void saveOrUpdateFile(String filePath, List<Table> list) throws IOException {
+    public static void saveOrUpdateFile(String filePath, List<Table> list, boolean append) throws IOException {
+
+        File f = new File(filePath);
 
         // Create an instance of FileOutputStream and ObjectOutputStream classes
-        FileOutputStream fos = new FileOutputStream( filePath, true);
-        ObjectOutputStream oos = new ObjectOutputStream(fos);
+        FileOutputStream fos = new FileOutputStream(filePath, append);
 
-        // Write modified objects to the file
-        oos.writeObject(list);
-        oos.close();
+        if (f.length() == 0) {
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            for (Table row : list)
+                oos.writeObject(row);
+            oos.close();
+        }
+        // There is content in file to be write on
+        else {
+
+            CustomOutputStream oos = new CustomOutputStream(fos);
+            for (Table row : list)
+                oos.writeObject(row);
+
+            // Closing the FileOutputStream object
+            // to release memory resources
+            oos.close();
+        }
         fos.close();
     }
 
