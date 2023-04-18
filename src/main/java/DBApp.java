@@ -7,6 +7,7 @@ import service.FileProcessor;
 
 import java.io.*;
 import java.lang.reflect.Field;
+import java.text.MessageFormat;
 import java.util.*;
 
 public class DBApp {
@@ -24,7 +25,7 @@ public class DBApp {
 
         tableGenerator(strTableName, dbApp);
 
-        //dbApp.createIndex(strTableName, new String[]{"gpa"});
+        dbApp.createIndex(strTableName, new String[]{"id","name", "gpa"});
 
         tableDataGenerator(strTableName, dbApp);
 
@@ -37,17 +38,22 @@ public class DBApp {
 
     private static void deleteTableData(String strTableName, DBApp dbApp) throws DBAppException {
 
+        //Data to be deleted
         Hashtable htblColNameValue = new Hashtable();
-        htblColNameValue.put("id", new String("23498"));
+        htblColNameValue.put("id", new String("78452"));
 
         deleteFromTable(strTableName, htblColNameValue);
     }
 
     private static void updateTableData(String strTableName, DBApp dbApp) throws DBAppException {
+
+        //Data to be updated
         Hashtable htblColNameValue = new Hashtable();
         htblColNameValue.put("name", new String("Ahmed Khan"));
 
-        updateTable(strTableName, "2343432", htblColNameValue);
+        //ClusteringKey (id) value to be used to find and update the value.
+        String clusteringKeyValue = "2343432";
+        updateTable(strTableName, clusteringKeyValue, htblColNameValue);
 
     }
 
@@ -123,8 +129,9 @@ public class DBApp {
         currentPart.put(strTableName, 1);
     }
 
-    public void init() {
+    public void init()  {
         appConfigs.loadConfigs("src/main/resources/DBApp.config");
+        FileProcessor.deleteExistingData("src/main/resources/output");
     }
 
 
@@ -163,6 +170,13 @@ public class DBApp {
 
     public void createIndex(String strTableName,
                             String[] strarrColName) throws DBAppException {
+
+      /*  Octree<String> octree;
+        if(strarrColName.length == 3){
+            octree = new Octree<>(0,0,0, 7, 7, 7);
+        }else{
+            throw new DBAppException(MessageFormat.format("Only {0} column names are provided. Please provide 3 column names", strTableName.length()));
+        }*/
 
     }
 
@@ -279,6 +293,7 @@ public class DBApp {
                                         field = obj.getClass().getDeclaredField(fieldName);
                                         field.setAccessible(true);
                                         if (field.get(obj).toString().equalsIgnoreCase(value.toString())) {
+                                            System.out.println("Deleting Row: "+obj);
                                             return true;
                                         }
                                     } catch (NoSuchFieldException | IllegalAccessException e) {
@@ -336,18 +351,22 @@ public class DBApp {
     }
 
     private String generateSql(SQLTerm[] arrSQLTerms,
-                               String[] strarrOperators) {
+                               String[] strarrOperators) throws DBAppException {
         String sqlStatement = "select * from ";
         String tableName = arrSQLTerms[0]._strTableName;
+        List<String> validOperators = Arrays.asList(">", ">=", "<", "<=", "!=", "=");
+        List<String> validStrArrOperators = Arrays.asList("AND","OR", "XOR");
 
         int index = 0;
         StringBuilder clause = new StringBuilder();
         for (SQLTerm arrSQLTerm : arrSQLTerms) {
+            if(!validOperators.contains(arrSQLTerm._strOperator)) throw new DBAppException("Invalid Operator Passed: "+arrSQLTerm._strOperator);
             clause.append(arrSQLTerm._strColumnName)
                     .append(arrSQLTerm._strOperator)
                     .append(arrSQLTerm._objValue);
 
             if(index < strarrOperators.length){
+                if(!validStrArrOperators.contains(strarrOperators[index])) throw new DBAppException("Invalid Operator Passed: "+strarrOperators[index]);
                 clause.append(" ").append(strarrOperators[index]).append(" ");
             }
             index++;

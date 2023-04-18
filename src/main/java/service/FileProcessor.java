@@ -96,4 +96,15 @@ public class FileProcessor {
         }
 
     }
+
+    public static void deleteExistingData(String filePath){
+
+        File directory = new File(filePath);
+        for(File file: directory.listFiles()) {
+            if (!file.isDirectory()) {
+                boolean result = file.delete();
+                if(result) System.out.println("Deleted: "+file.getName());
+            }
+        }
+    }
 }
