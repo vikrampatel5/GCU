@@ -4,23 +4,24 @@ import exceptions.DBAppException;
 import model.Table;
 import model.TableMetadata;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
 public class FileProcessor {
 
-    public static List<Table> readFile(String strTableName) throws IOException, ClassNotFoundException {
+    public static Vector<Table> readFile(String strTableName) throws IOException, ClassNotFoundException {
 
 
         File file = new File(strTableName);
 
-        List<Table> rowList = new ArrayList<>();
+        Vector<Table> rowList = new Vector<>();
 
         if (file.length() != 0) {
 
@@ -97,13 +98,79 @@ public class FileProcessor {
 
     }
 
-    public static void deleteExistingData(String filePath){
+    public static Vector<TableMetadata> readMetadata(String filePath) throws IOException {
+
+        Vector<TableMetadata> metadataList = new Vector<>();
+        try (
+                Reader reader = Files.newBufferedReader(Paths.get(filePath));
+                CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT);
+        ) {
+
+            TableMetadata metadata;
+            for (CSVRecord csvRecord : csvParser) {
+                metadata = new TableMetadata();
+                metadata.setTableName(csvRecord.get(0));
+                metadata.setColumnName(csvRecord.get(1));
+                metadata.setColumnType(csvRecord.get(2));
+                metadata.setClusteringKey(Boolean.parseBoolean(csvRecord.get(3)));
+                metadata.setIndexName(csvRecord.get(4));
+                metadata.setIndexType(csvRecord.get(5));
+                metadata.setMin(csvRecord.get(6));
+                metadata.setMin(csvRecord.get(7));
+
+                metadataList.add(metadata);
+            }
+
+            return metadataList;
+        }
+    }
+
+    public static void saveOctreeToFile(Octree<String> octree, String tableName) {
+        try {
+            String path = "src/main/resources/output/";
+            String filePath = path+"Index"+tableName+".ser";
+            FileOutputStream fileOut = new FileOutputStream(filePath);
+            ObjectOutputStream out = new ObjectOutputStream(fileOut);
+            out.writeObject(octree);
+            out.close();
+            fileOut.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static Octree<String> loadOctreeFromFile() {
+        String path = "src/main/resources/output/";
+        String tableName = "IndexStudent.ser";
+
+        String filePath = path+tableName;
+        Octree<String> octree = null;
+        try {
+            File file = new File(filePath);
+            if (file.exists()) {
+                System.out.println("Loading Octree indexes!! from file: "+filePath);
+                FileInputStream fileIn = new FileInputStream(filePath);
+                ObjectInputStream in = new ObjectInputStream(fileIn);
+                octree = (Octree<String>) in.readObject();
+                in.close();
+                fileIn.close();
+            } else {
+                System.out.println(filePath + " : File does not exist.");
+            }
+
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return octree;
+    }
+
+    public static void deleteExistingData(String filePath) {
 
         File directory = new File(filePath);
-        for(File file: directory.listFiles()) {
+        for (File file : directory.listFiles()) {
             if (!file.isDirectory()) {
                 boolean result = file.delete();
-                if(result) System.out.println("Deleted: "+file.getName());
+                if (result) System.out.println("Deleted: " + file.getName());
             }
         }
     }

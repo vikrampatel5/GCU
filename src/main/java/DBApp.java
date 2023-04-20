@@ -4,6 +4,7 @@ import model.Table;
 import model.TableMetadata;
 import service.AppConfigs;
 import service.FileProcessor;
+import service.Octree;
 
 import java.io.*;
 import java.lang.reflect.Field;
@@ -14,6 +15,8 @@ public class DBApp {
 
     AppConfigs appConfigs = AppConfigs.getInstance();
     static HashMap<String, Integer> currentPart = new HashMap<>();
+
+    Octree<String> octree;
 
     public static void main(String[] args) throws DBAppException {
 
@@ -131,6 +134,7 @@ public class DBApp {
 
     public void init()  {
         appConfigs.loadConfigs("src/main/resources/DBApp.config");
+        this.octree = FileProcessor.loadOctreeFromFile();
         FileProcessor.deleteExistingData("src/main/resources/output");
     }
 
@@ -165,18 +169,31 @@ public class DBApp {
 
         FileProcessor.saveMetaData(fileName, metadata);
 
-
     }
 
     public void createIndex(String strTableName,
                             String[] strarrColName) throws DBAppException {
 
-      /*  Octree<String> octree;
-        if(strarrColName.length == 3){
-            octree = new Octree<>(0,0,0, 7, 7, 7);
-        }else{
-            throw new DBAppException(MessageFormat.format("Only {0} column names are provided. Please provide 3 column names", strTableName.length()));
-        }*/
+        try{
+            if(octree == null){
+                if(strarrColName.length == 3 ){
+                    octree = new Octree<>(0,0,0, 7, 7, 7);
+                }else{
+                    throw new DBAppException(MessageFormat.format("Only {0} column names are provided. Please provide 3 column names", Arrays.stream(strarrColName).count()));
+                }
+            }
+
+            Vector<TableMetadata> tableMetadata = FileProcessor.readMetadata("src/main/resources/output/metadata.csv");
+            Map<String, TableMetadata> indexColsMetadata = new HashMap<>();
+
+            for(String indexColName : strarrColName){
+                Optional<TableMetadata> matchedMetadata = tableMetadata.stream().filter(m -> m.getColumnName().equalsIgnoreCase(indexColName)).findFirst();
+                indexColsMetadata.put(indexColName,matchedMetadata.get());
+            }
+
+        }catch (Exception e){
+            throw new DBAppException("Error while creating index: "+e.getMessage());
+        }
 
     }
 
@@ -216,6 +233,18 @@ public class DBApp {
 
             FileProcessor.saveOrUpdateFile(filePath, data, true);
 
+            //Update index
+            for(int x=0; x<=7; x++){
+                for(int y=0; y<=7; y++){
+                    for(int z=0; z<=7; z++){
+                        if(!octree.find(x,y,z)){
+                            octree.insert(x,y,z,filePath);
+                            FileProcessor.saveOctreeToFile(octree, strTableName);
+                            break;
+                        }
+                    }
+                }
+            }
 
             System.out.println("Serialized data is saved in info.ser");
 
@@ -239,8 +268,8 @@ public class DBApp {
             if (files != null) {
                 for (File file : files) {
                     if (file.isFile()) {
-                        List<Table> list = FileProcessor.readFile(file.toString());
-                        List<Table> updatedList = new ArrayList<>();
+                        Vector<Table> list = FileProcessor.readFile(file.toString());
+                        Vector<Table> updatedList = new Vector<>();
                         for (Table table : list) {
                             if (table.getId() == Integer.parseInt(strClusteringKeyValue)) {
                                 System.out.println("Old Row: " + table);
@@ -280,7 +309,7 @@ public class DBApp {
             if (files != null) {
                 for (File file : files) {
                     if (file.isFile()) {
-                        List<Table> rows = FileProcessor.readFile(file.toString());
+                        Vector<Table> rows = FileProcessor.readFile(file.toString());
                         System.out.println("Rows Count: "+rows.size());
                             htblColNameValue.keySet().forEach(key -> {
                                 String fieldName = key;
@@ -330,11 +359,17 @@ public class DBApp {
         String sql = generateSql(arrSQLTerms, strarrOperators);
         System.out.println("Generated SQL: "+sql);
 
+        Vector<Table> rows = readFullTable("Student");
+
+        return rows.iterator();
+    }
+
+    private Vector<Table> readFullTable(String tableName) throws DBAppException {
         Vector<Table> rows = new Vector<>();
 
         String path = "src/main/resources/output/";
         File folder = new File(path);
-        File[] files = folder.listFiles((dir, name) -> name.startsWith("Student"));
+        File[] files = folder.listFiles((dir, name) -> name.startsWith(tableName));
         if (files != null) {
             for (File file : files) {
                 if (file.isFile()) {
@@ -346,8 +381,27 @@ public class DBApp {
                 }
             }
         }
+        return rows;
+    }
 
-        return rows.iterator();
+    private Map<Vector<Table>, String> readFullTableWithFilePath(String tableName) throws DBAppException {
+        Map<Vector<Table>, String> rowsWithFilePath = new HashMap<>();
+
+        String path = "src/main/resources/output/";
+        File folder = new File(path);
+        File[] files = folder.listFiles((dir, name) -> name.startsWith(tableName));
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    try {
+                        rowsWithFilePath.put(FileProcessor.readFile(file.toString()), file.toString());
+                    } catch (IOException | ClassNotFoundException e) {
+                        throw new DBAppException("Exception while reading data from table!!");
+                    }
+                }
+            }
+        }
+        return rowsWithFilePath;
     }
 
     private String generateSql(SQLTerm[] arrSQLTerms,
