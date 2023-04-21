@@ -139,7 +139,7 @@ public class DBApp {
 
     public void init()  {
         appConfigs.loadConfigs("src/main/resources/DBApp.config");
-        this.octree = FileProcessor.loadOctreeFromFile();
+        octree = FileProcessor.loadOctreeFromFile();
         FileProcessor.deleteExistingData("src/main/resources/output");
     }
 
