@@ -3,11 +3,11 @@ package service;
 import java.io.Serializable;
 
 public class Point implements Serializable {
-    public double x;
-    public double y;
-    public double z;
+    public int x;
+    public int y;
+    public int z;
 
-    public Point(double x, double y, double z) {
+    public Point(int x, int y, int z) {
         this.x = x;
         this.y = y;
         this.z = z;

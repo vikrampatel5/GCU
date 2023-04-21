@@ -5,6 +5,7 @@ import model.TableMetadata;
 import service.AppConfigs;
 import service.FileProcessor;
 import service.Octree;
+import service.Point;
 
 import java.io.*;
 import java.lang.reflect.Field;
@@ -16,7 +17,11 @@ public class DBApp {
     AppConfigs appConfigs = AppConfigs.getInstance();
     static HashMap<String, Integer> currentPart = new HashMap<>();
 
-    Octree<String> octree;
+    static Octree<String> octree;
+
+    static HashMap<String, Point> valueIndex = new HashMap<>();
+
+    Map<String, TableMetadata> indexColsMetadata = new HashMap<>();
 
     public static void main(String[] args) throws DBAppException {
 
@@ -184,7 +189,6 @@ public class DBApp {
             }
 
             Vector<TableMetadata> tableMetadata = FileProcessor.readMetadata("src/main/resources/output/metadata.csv");
-            Map<String, TableMetadata> indexColsMetadata = new HashMap<>();
 
             for(String indexColName : strarrColName){
                 Optional<TableMetadata> matchedMetadata = tableMetadata.stream().filter(m -> m.getColumnName().equalsIgnoreCase(indexColName)).findFirst();
@@ -233,18 +237,14 @@ public class DBApp {
 
             FileProcessor.saveOrUpdateFile(filePath, data, true);
 
-            //Update index
-            for(int x=0; x<=7; x++){
-                for(int y=0; y<=7; y++){
-                    for(int z=0; z<=7; z++){
-                        if(!octree.find(x,y,z)){
-                            octree.insert(x,y,z,filePath);
-                            FileProcessor.saveOctreeToFile(octree, strTableName);
-                            break;
-                        }
-                    }
+            //Add value to index
+            String finalFilePath = filePath;
+            htblColNameValue.keySet().forEach(key -> {
+                if(indexColsMetadata.containsKey(key)){
+                    addValueToIndex(strTableName, key+"#"+htblColNameValue.get(key), finalFilePath);
                 }
-            }
+            });
+
 
             System.out.println("Serialized data is saved in info.ser");
 
@@ -253,6 +253,52 @@ public class DBApp {
         }
 
 
+    }
+
+    private static void addValueToIndex(String strTableName, String indexName, String refFilePath) {
+        boolean pointFound = false;
+        String path = "src/main/resources/output/";
+        String octreeFilePath = path+"Octree"+strTableName+".ser";
+        for(int x=0; x<=7; x++){
+            for(int y=0; y<=7; y++){
+                for(int z=0; z<=7; z++){
+                    if(!octree.find(x,y,z)){
+                        pointFound = true;
+                        octree.insert(x,y,z, refFilePath);
+                        System.out.println(MessageFormat.format("Added index at point: x:{0} y:{1} z:{2}", x, y, z));
+                        FileProcessor.saveObjectToFile(octree, octreeFilePath, false);
+
+                        //Save index value to a file
+                        valueIndex.put(indexName, new Point(x,y,z));
+                        String indexFilePath = path+"Index"+strTableName+".ser";
+                        FileProcessor.saveObjectToFile(valueIndex,indexFilePath,true);
+
+                        break;
+                    }
+                }
+                if(pointFound) break;
+            }
+            if(pointFound) break;
+        }
+    }
+
+    private static void updateIndex(String indexName, String strTableName, String refFilePath, String operation) {
+
+        String path = "src/main/resources/output/";
+        String octreeFilePath = path+"Octree"+strTableName+".ser";
+
+        if (valueIndex.containsKey(indexName)) {
+            Point point = valueIndex.get(indexName);
+            octree.remove(point.x, point.y, point.z);
+            if (operation.equalsIgnoreCase("update")) {
+                octree.insert(point.x, point.y, point.y, refFilePath);
+                valueIndex.replace(indexName,point);
+                System.out.println(MessageFormat.format("Updated index at point: x:{0} y:{1} z:{2}", point.x, point.y, point.z));
+            }
+            FileProcessor.saveObjectToFile(octree, octreeFilePath, false);
+        }else{
+            addValueToIndex(strTableName, indexName, refFilePath);
+        }
     }
 
     public static void updateTable(String strTableName,
@@ -280,6 +326,9 @@ public class DBApp {
                                         field.set(table, htblColNameValue.get(key));
                                         field.setAccessible(true);
                                         System.out.println("Updated Row: " + table);
+                                        String colName = key;
+                                        String value = (String) htblColNameValue.get(key);
+                                        updateIndex(colName+"#"+value,strTableName,file.toString(),"update");
                                     } catch (NoSuchFieldException | IllegalAccessException e) {
                                         throw new RuntimeException(e);
                                     }

@@ -125,15 +125,24 @@ public class FileProcessor {
         }
     }
 
-    public static void saveOctreeToFile(Octree<String> octree, String tableName) {
+    public static void saveObjectToFile(Object obj, String filePath, boolean append) {
         try {
-            String path = "src/main/resources/output/";
-            String filePath = path+"Index"+tableName+".ser";
-            FileOutputStream fileOut = new FileOutputStream(filePath);
-            ObjectOutputStream out = new ObjectOutputStream(fileOut);
-            out.writeObject(octree);
-            out.close();
-            fileOut.close();
+            File f = new File(filePath);
+
+            // Create an instance of FileOutputStream and ObjectOutputStream classes
+            FileOutputStream fos = new FileOutputStream(filePath, append);
+
+            if (f.length() == 0) {
+                ObjectOutputStream oos = new ObjectOutputStream(fos);
+                oos.writeObject(obj);
+            }
+            else {
+
+                CustomOutputStream oos = new CustomOutputStream(fos);
+                oos.writeObject(obj);
+                oos.close();
+            }
+            fos.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
