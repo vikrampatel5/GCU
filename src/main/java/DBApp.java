@@ -139,7 +139,8 @@ public class DBApp {
 
     public void init()  {
         appConfigs.loadConfigs("src/main/resources/DBApp.config");
-        octree = FileProcessor.loadOctreeFromFile();
+        octree = FileProcessor.loadOctreeFromFile("Student");
+        valueIndex = FileProcessor.loadIndexesFromFile("Student");
         FileProcessor.deleteExistingData("src/main/resources/output");
     }
 
@@ -282,7 +283,7 @@ public class DBApp {
         }
     }
 
-    private static void updateIndex(String indexName, String strTableName, String refFilePath, String operation) {
+    private static void updateOrDeleteIndex(String indexName, String strTableName, String refFilePath, String operation) {
 
         String path = "src/main/resources/output/";
         String octreeFilePath = path+"Octree"+strTableName+".ser";
@@ -294,6 +295,8 @@ public class DBApp {
                 octree.insert(point.x, point.y, point.y, refFilePath);
                 valueIndex.replace(indexName,point);
                 System.out.println(MessageFormat.format("Updated index at point: x:{0} y:{1} z:{2}", point.x, point.y, point.z));
+            }else{
+                System.out.println(MessageFormat.format("Removed index at point: x:{0} y:{1} z:{2}", point.x, point.y, point.z));
             }
             FileProcessor.saveObjectToFile(octree, octreeFilePath, false);
         }else{
@@ -328,7 +331,7 @@ public class DBApp {
                                         System.out.println("Updated Row: " + table);
                                         String colName = key;
                                         String value = (String) htblColNameValue.get(key);
-                                        updateIndex(colName+"#"+value,strTableName,file.toString(),"update");
+                                        updateOrDeleteIndex(colName+"#"+value,strTableName,file.toString(),"update");
                                     } catch (NoSuchFieldException | IllegalAccessException e) {
                                         throw new RuntimeException(e);
                                     }
@@ -372,6 +375,7 @@ public class DBApp {
                                         field.setAccessible(true);
                                         if (field.get(obj).toString().equalsIgnoreCase(value.toString())) {
                                             System.out.println("Deleting Row: "+obj);
+                                            updateOrDeleteIndex(fieldName+"#"+value,strTableName,file.toString(),"delete");
                                             return true;
                                         }
                                     } catch (NoSuchFieldException | IllegalAccessException e) {

@@ -11,6 +11,7 @@ import org.apache.commons.csv.CSVRecord;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Vector;
 
@@ -148,16 +149,16 @@ public class FileProcessor {
         }
     }
 
-    public static Octree<String> loadOctreeFromFile() {
+    public static Octree<String> loadOctreeFromFile(String strTableName) {
         String path = "src/main/resources/output/";
-        String tableName = "IndexStudent.ser";
+        String tableName = "Octree"+strTableName+".ser";
 
         String filePath = path+tableName;
         Octree<String> octree = null;
         try {
             File file = new File(filePath);
             if (file.exists()) {
-                System.out.println("Loading Octree indexes!! from file: "+filePath);
+                System.out.println("Loading Octree!! from file: "+filePath);
                 FileInputStream fileIn = new FileInputStream(filePath);
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 octree = (Octree<String>) in.readObject();
@@ -171,6 +172,31 @@ public class FileProcessor {
             e.printStackTrace();
         }
         return octree;
+    }
+
+    public static HashMap<String, Point> loadIndexesFromFile(String strTableName) {
+        String path = "src/main/resources/output/";
+        String tableName = "Index"+strTableName+".ser";
+
+        String filePath = path+tableName;
+        HashMap<String, Point> indexMap = new HashMap<>();
+        try {
+            File file = new File(filePath);
+            if (file.exists()) {
+                System.out.println("Loading indexes!! from file: "+filePath);
+                FileInputStream fileIn = new FileInputStream(filePath);
+                ObjectInputStream in = new ObjectInputStream(fileIn);
+                indexMap = (HashMap<String, Point>) in.readObject();
+                in.close();
+                fileIn.close();
+            } else {
+                System.out.println(filePath + " : File does not exist.");
+            }
+
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return indexMap;
     }
 
     public static void deleteExistingData(String filePath) {
