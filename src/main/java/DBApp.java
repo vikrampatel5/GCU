@@ -11,6 +11,7 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.text.MessageFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class DBApp {
 
@@ -71,21 +72,22 @@ public class DBApp {
         arrSQLTerms[0]._strTableName = "Student";
         arrSQLTerms[0]._strColumnName = "name";
         arrSQLTerms[0]._strOperator = "=";
-        arrSQLTerms[0]._objValue = "John Noor";
+        arrSQLTerms[0]._objValue = "Dalia Noor";
 
         arrSQLTerms[1] = new SQLTerm();
         arrSQLTerms[1]._strTableName = "Student";
         arrSQLTerms[1]._strColumnName = "gpa";
         arrSQLTerms[1]._strOperator = "=";
-        arrSQLTerms[1]._objValue = new Double(1.5);
+        arrSQLTerms[1]._objValue = new Double(1.25);
         String[] strarrOperators = new String[1];
         strarrOperators[0] = "OR";
 
-        Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+        Iterator matchedData = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
 
-        while(resultSet.hasNext()) {
-            System.out.println(resultSet.next());
+        if(matchedData.hasNext()){
+            System.out.println("Found Record = " + matchedData.next());
         }
+
     }
 
     private static void tableDataGenerator(String strTableName, DBApp dbApp) throws DBAppException {
@@ -412,7 +414,15 @@ public class DBApp {
         String sql = generateSql(arrSQLTerms, strarrOperators);
         System.out.println("Generated SQL: "+sql);
 
-        Vector<Table> rows = readFullTable("Student");
+        //Vector<Table> rows = readFullTable("Student");
+
+        Vector<Table> rows = new Vector<>();
+
+        try {
+            rows = readDataUsingIndex(arrSQLTerms,strarrOperators);
+        } catch (IOException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
 
         return rows.iterator();
     }
@@ -481,6 +491,44 @@ public class DBApp {
 
         sqlStatement = sqlStatement + tableName + " where " + clause;
         return sqlStatement;
+    }
+
+    private Vector<Table> readDataUsingIndex(SQLTerm[] arrSQLTerms,
+                                             String[] strarrOperators) throws DBAppException, IOException, ClassNotFoundException {
+
+        List<String> validOperators = Arrays.asList(">", ">=", "<", "<=", "!=", "=");
+        List<String> validStrArrOperators = Arrays.asList("AND","OR", "XOR");
+
+        Vector<Table> rows = new Vector<>();
+
+        int index = 0;
+        for (SQLTerm arrSQLTerm : arrSQLTerms) {
+            if(!validOperators.contains(arrSQLTerm._strOperator)) throw new DBAppException("Invalid Operator Passed: "+arrSQLTerm._strOperator);
+            if(indexColsMetadata.containsKey(arrSQLTerm._strColumnName)
+                    && indexColsMetadata.get(arrSQLTerm._strColumnName).getIndexType().equalsIgnoreCase("octree")){
+
+                    String colName = arrSQLTerm._strColumnName;
+                    String colValue = String.valueOf(arrSQLTerm._objValue);
+                    Point p = valueIndex.get(colName+"#"+colValue);
+                    String refFilePath = octree.get(p.x, p.y,  p.z);
+                    Vector<Table> data = FileProcessor.readFile(refFilePath);
+                    final Field[] field = new Field[1];
+                    data = data.stream().filter(row -> {
+                        try {
+                            field[0] = row.getClass().getDeclaredField(colName);
+                            field[0].setAccessible(true);
+                            if (field[0].get(row).toString().equalsIgnoreCase(colValue)) {
+                                return true;
+                            }
+                            else return false;
+                        } catch (NoSuchFieldException | IllegalAccessException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }).collect(Collectors.toCollection(Vector::new));
+                    rows.addAll(data);
+            }
+        }
+        return rows;
     }
 
 }
