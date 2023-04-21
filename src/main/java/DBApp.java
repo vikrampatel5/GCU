@@ -2,15 +2,13 @@ import exceptions.DBAppException;
 import model.SQLTerm;
 import model.Table;
 import model.TableMetadata;
-import service.AppConfigs;
-import service.FileProcessor;
-import service.Octree;
-import service.Point;
+import service.*;
 
 import java.io.*;
 import java.lang.reflect.Field;
 import java.text.MessageFormat;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class DBApp {
@@ -79,6 +77,7 @@ public class DBApp {
         arrSQLTerms[1]._strColumnName = "gpa";
         arrSQLTerms[1]._strOperator = "=";
         arrSQLTerms[1]._objValue = new Double(1.25);
+
         String[] strarrOperators = new String[1];
         strarrOperators[0] = "OR";
 
@@ -444,6 +443,9 @@ public class DBApp {
                 }
             }
         }
+        if(rows.size() == 0){
+            System.out.println("No Records Found!!");
+        }
         return rows;
     }
 
@@ -471,64 +473,80 @@ public class DBApp {
                                String[] strarrOperators) throws DBAppException {
         String sqlStatement = "select * from ";
         String tableName = arrSQLTerms[0]._strTableName;
+
+        StringBuilder whereClause = generateWhereClause(arrSQLTerms, strarrOperators);
+
+        sqlStatement = sqlStatement + tableName + " where " + whereClause;
+        return sqlStatement;
+    }
+
+    private StringBuilder generateWhereClause(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
+
         List<String> validOperators = Arrays.asList(">", ">=", "<", "<=", "!=", "=");
-        List<String> validStrArrOperators = Arrays.asList("AND","OR", "XOR");
+        List<String> validStrArrOperators = Arrays.asList("AND","OR");
 
         int index = 0;
+
         StringBuilder clause = new StringBuilder();
         for (SQLTerm arrSQLTerm : arrSQLTerms) {
             if(!validOperators.contains(arrSQLTerm._strOperator)) throw new DBAppException("Invalid Operator Passed: "+arrSQLTerm._strOperator);
-            clause.append(arrSQLTerm._strColumnName)
-                    .append(arrSQLTerm._strOperator)
-                    .append(arrSQLTerm._objValue);
+            clause.append(arrSQLTerm._strColumnName).append(" ")
+                    .append(arrSQLTerm._strOperator).append(" ");
+            if(indexColsMetadata.get(arrSQLTerm._strColumnName).getColumnType().equals("java.lang.String"))
+                clause.append("'").append(arrSQLTerm._objValue).append("'");
+            else clause.append(arrSQLTerm._objValue);
 
             if(index < strarrOperators.length){
-                if(!validStrArrOperators.contains(strarrOperators[index])) throw new DBAppException("Invalid Operator Passed: "+strarrOperators[index]);
+                if(!validStrArrOperators.contains(strarrOperators[index])) throw new DBAppException("Invalid Operator Passed: "+ strarrOperators[index]);
                 clause.append(" ").append(strarrOperators[index]).append(" ");
             }
+
             index++;
         }
-
-        sqlStatement = sqlStatement + tableName + " where " + clause;
-        return sqlStatement;
+        return clause;
     }
 
     private Vector<Table> readDataUsingIndex(SQLTerm[] arrSQLTerms,
                                              String[] strarrOperators) throws DBAppException, IOException, ClassNotFoundException {
 
         List<String> validOperators = Arrays.asList(">", ">=", "<", "<=", "!=", "=");
-        List<String> validStrArrOperators = Arrays.asList("AND","OR", "XOR");
 
         Vector<Table> rows = new Vector<>();
 
-        int index = 0;
         for (SQLTerm arrSQLTerm : arrSQLTerms) {
             if(!validOperators.contains(arrSQLTerm._strOperator)) throw new DBAppException("Invalid Operator Passed: "+arrSQLTerm._strOperator);
             if(indexColsMetadata.containsKey(arrSQLTerm._strColumnName)
                     && indexColsMetadata.get(arrSQLTerm._strColumnName).getIndexType().equalsIgnoreCase("octree")){
-
                     String colName = arrSQLTerm._strColumnName;
                     String colValue = String.valueOf(arrSQLTerm._objValue);
-                    Point p = valueIndex.get(colName+"#"+colValue);
-                    String refFilePath = octree.get(p.x, p.y,  p.z);
-                    Vector<Table> data = FileProcessor.readFile(refFilePath);
-                    final Field[] field = new Field[1];
-                    data = data.stream().filter(row -> {
-                        try {
-                            field[0] = row.getClass().getDeclaredField(colName);
-                            field[0].setAccessible(true);
-                            if (field[0].get(row).toString().equalsIgnoreCase(colValue)) {
-                                return true;
+                    if(valueIndex.containsKey(colName+"#"+colValue)){
+                        Point p = valueIndex.get(colName+"#"+colValue);
+                        String refFilePath = octree.get(p.x, p.y,  p.z);
+                        Vector<Table> data = FileProcessor.readFile(refFilePath);
+                        final Field[] field = new Field[1];
+                        data = data.stream().filter(row -> {
+                            try {
+                                field[0] = row.getClass().getDeclaredField(colName);
+                                field[0].setAccessible(true);
+                                if (field[0].get(row).toString().equalsIgnoreCase(colValue)) {
+                                    return true;
+                                }
+                                else return false;
+                            } catch (NoSuchFieldException | IllegalAccessException e) {
+                                throw new RuntimeException(e);
                             }
-                            else return false;
-                        } catch (NoSuchFieldException | IllegalAccessException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }).collect(Collectors.toCollection(Vector::new));
-                    rows.addAll(data);
+                        }).collect(Collectors.toCollection(Vector::new));
+                        rows.addAll(data);
+                    }
+
+
             }
         }
-        return rows;
+
+        int index = 0;
+        StringBuilder whereClause = generateWhereClause(arrSQLTerms,strarrOperators);
+        Predicate<Table> predicate = WhereClauseToPredicateConverter.convertWhereClauseToPredicate(whereClause.toString());
+        return WhereClauseToPredicateConverter.filterTables(rows,predicate);
     }
 
 }
