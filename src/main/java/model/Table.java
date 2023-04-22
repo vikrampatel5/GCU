@@ -7,6 +7,8 @@ public class Table implements Serializable {
     public String name;
     public double gpa;
 
+    public double total;
+
     public Table() {
     }
 
@@ -40,12 +42,21 @@ public class Table implements Serializable {
         this.gpa = gpa;
     }
 
+    public double getTotal() {
+        return total;
+    }
+
+    public void setTotal(double total) {
+        this.total = total;
+    }
+
     @Override
     public String toString() {
         return "Table{" +
                 "id=" + id +
                 ", name='" + name + '\'' +
                 ", gpa=" + gpa +
+                ", total=" + total +
                 '}';
     }
 }

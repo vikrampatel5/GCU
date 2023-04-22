@@ -36,13 +36,13 @@ public class WhereClauseToPredicateConverter {
             if ("=".equals(operator)) {
                 return p -> getValue(p, field).toString().equalsIgnoreCase(value);
             } else if (">".equals(operator)) {
-                return p -> (int)getValue(p, field) > Integer.parseInt(value);
+                return p -> (double)getValue(p, field) > Double.parseDouble(value);
             } else if ("<".equals(operator)) {
-                return p -> (int)getValue(p, field) < Integer.parseInt(value);
+                return p -> (double)getValue(p, field) < Double.parseDouble(value);
             } else if (">=".equals(operator)) {
-                return p -> (int)getValue(p, field) >= Integer.parseInt(value);
+                return p -> (double)getValue(p, field) >= Double.parseDouble(value);
             } else if ("<=".equals(operator)) {
-                return p -> (int)getValue(p, field) <= Integer.parseInt(value);
+                return p -> (double)getValue(p, field) <= Double.parseDouble(value);
             } else if ("!=".equals(operator)) {
                 return p -> !getValue(p, field).equals(value);
             }
