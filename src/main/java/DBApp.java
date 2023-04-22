@@ -56,10 +56,10 @@ public class DBApp {
 
         //Data to be updated
         Hashtable htblColNameValue = new Hashtable();
-        htblColNameValue.put("name", new String("Ahmed Khan"));
+        htblColNameValue.put("name", new String("Mickey Johnson"));
 
         //ClusteringKey (id) value to be used to find and update the value.
-        String clusteringKeyValue = "2343432";
+        String clusteringKeyValue = "12345";
         updateTable(strTableName, clusteringKeyValue, htblColNameValue);
 
     }
@@ -70,13 +70,13 @@ public class DBApp {
         arrSQLTerms[0]._strTableName = "Student";
         arrSQLTerms[0]._strColumnName = "name";
         arrSQLTerms[0]._strOperator = "=";
-        arrSQLTerms[0]._objValue = "Dalia Noor";
+        arrSQLTerms[0]._objValue = "Mickey Johnson";
 
         arrSQLTerms[1] = new SQLTerm();
         arrSQLTerms[1]._strTableName = "Student";
         arrSQLTerms[1]._strColumnName = "gpa";
         arrSQLTerms[1]._strOperator = "=";
-        arrSQLTerms[1]._objValue = new Double(1.25);
+        arrSQLTerms[1]._objValue = new Double(1.6);
 
         String[] strarrOperators = new String[1];
         strarrOperators[0] = "OR";
@@ -106,6 +106,12 @@ public class DBApp {
         htblColNameValue.put("id", new Integer(23498));
         htblColNameValue.put("name", new String("John Noor"));
         htblColNameValue.put("gpa", new Double(1.5));
+        dbApp.insertIntoTable(strTableName, htblColNameValue);
+
+        htblColNameValue.clear();
+        htblColNameValue.put("id", new Integer(12345));
+        htblColNameValue.put("name", new String("Mickey Noor"));
+        htblColNameValue.put("gpa", new Double(1.6));
         dbApp.insertIntoTable(strTableName, htblColNameValue);
 
         htblColNameValue.clear();
@@ -238,6 +244,7 @@ public class DBApp {
             }
 
             FileProcessor.saveOrUpdateFile(filePath, data, true);
+            data.forEach(row -> System.out.println("Inserted: "+row));
 
             //Add value to index
             String finalFilePath = filePath;
